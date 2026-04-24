@@ -19,6 +19,8 @@ package com.android.axion.axthemestore.engine
 import android.content.Context
 import android.content.om.OverlayManager
 import android.content.res.ThemeEngine
+import android.hardware.fingerprint.FingerprintManager
+import android.hardware.fingerprint.FingerprintSensorPropertiesInternal
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.UserHandle
@@ -27,6 +29,17 @@ import android.util.Log
 import org.json.JSONObject
 
 class ThemeEngineProxy(private val context: Context) {
+
+    fun isUdfpsSupported(): Boolean {
+        return try {
+            val fm = context.getSystemService(FingerprintManager::class.java)
+            val props = fm?.sensorPropertiesInternal
+            props?.any { it.isAnyUdfpsType } == true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to check UDFPS support", e)
+            false
+        }
+    }
 
     companion object {
         private const val TAG = "ThemeEngineProxy"
@@ -44,6 +57,8 @@ class ThemeEngineProxy(private val context: Context) {
             "android.theme.customization.back_gesture",
             "android.theme.customization.charging_animation",
             "android.theme.customization.battery_style",
+            "android.theme.customization.udfps_animation",
+            "android.theme.customization.udfps_icon",
         )
 
         object Category {

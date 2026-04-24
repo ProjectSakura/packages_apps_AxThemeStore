@@ -56,6 +56,7 @@ import com.android.axion.axthemestore.data.model.ThemeCategory
 import com.android.axion.axthemestore.data.model.ThemeInstallState
 import com.android.axion.axthemestore.engine.ThemeEngineProxy
 import com.android.axion.axthemestore.ui.components.AsyncNetworkImage
+import com.android.axion.axthemestore.ui.components.UdfpsAnimationBannerPreview
 import com.android.axion.axthemestore.ui.components.BackGesturePreview
 import com.android.axion.axthemestore.ui.components.BatteryStylePreview
 import com.android.axion.axthemestore.ui.components.ThemeCard
@@ -581,6 +582,7 @@ private fun ThemeListItem(
                 val isBattery = packageName.contains("battery") || category.contains("battery")
                 val isBackGesture = packageName.contains("back_gesture") || category.contains("back_gesture")
                 val isChargingAnim = packageName.contains("charging_animation") || category.contains("charging_animation")
+                val isUdfpsAnim = packageName.contains("udfps_animation") || category.contains("udfps_animation")
 
                 run {
                     val previewResIds = getLocalPreviewResIds(LocalContext.current, packageName)
@@ -655,6 +657,48 @@ private fun ThemeListItem(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    } else if (isUdfpsAnim) {
+                        UdfpsAnimationBannerPreview(
+                            packageName = packageName,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else if (theme.previewImages.isNotEmpty()) {
+                        AsyncNetworkImage(
+                            url = theme.previewImages.first(),
+                            contentDescription = theme.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            errorContent = {
+                                if (isInstalled && packageName.isNotEmpty()) {
+                                    ThemePackagePreview(
+                                        packageName = packageName,
+                                        modifier = Modifier.fillMaxSize(),
+                                        showSingleIcon = true
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(
+                                                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                                                        MaterialTheme.colorScheme.surfaceContainer
+                                                    )
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Palette,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(24.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        )
                     } else if (isInstalled && packageName.isNotEmpty()) {
                         ThemePackagePreview(
                             packageName = packageName,
@@ -760,11 +804,20 @@ private fun CompactThemeCard(
                     .height(100.dp)
                     .clip(MaterialTheme.shapes.medium)
             ) {
-                val isInstalled = installState is ThemeInstallState.Installed || 
+                val isInstalled = installState is ThemeInstallState.Installed ||
                                   installState is ThemeInstallState.InstalledInactive
                 val packageName = theme.overlays.firstOrNull()?.packageName
-                
+                val category = theme.category.ifEmpty { theme.overlays.firstOrNull()?.componentId ?: "" }
+                val isUdfpsAnim = (packageName?.contains("udfps_animation") == true) ||
+                        category.contains("udfps_animation")
+
                 when {
+                    isUdfpsAnim && packageName != null -> {
+                        UdfpsAnimationBannerPreview(
+                            packageName = packageName,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                     theme.previewImages.isNotEmpty() -> {
                         AsyncNetworkImage(
                             url = theme.previewImages.first(),

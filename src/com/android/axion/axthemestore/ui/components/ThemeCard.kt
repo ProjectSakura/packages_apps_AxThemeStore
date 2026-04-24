@@ -41,6 +41,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
 import com.android.axion.axthemestore.R
 import com.android.axion.axthemestore.data.model.Theme
 import com.android.axion.axthemestore.data.model.ThemeInstallState
@@ -274,6 +275,7 @@ private fun LocalPreviewBox(theme: Theme) {
 
     val isBattery = packageName.contains("battery") || category.contains("battery")
     val isBackGesture = packageName.contains("back_gesture") || category.contains("back_gesture")
+    val isUdfpsAnim = packageName.contains("udfps_animation") || category.contains("udfps_animation")
 
     Box(
         modifier = Modifier
@@ -311,6 +313,26 @@ private fun LocalPreviewBox(theme: Theme) {
             )
         } else if (isBackGesture) {
             BackGesturePreview(modifier = Modifier.fillMaxSize())
+        } else if (isUdfpsAnim) {
+            UdfpsAnimationBannerPreview(
+                packageName = packageName,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (theme.previewImages.isNotEmpty()) {
+            AsyncNetworkImage(
+                url = theme.previewImages.first(),
+                contentDescription = theme.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                errorContent = {
+                    Icon(
+                        imageVector = categoryIcon(theme),
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+            )
         } else {
             Icon(
                 imageVector = categoryIcon(theme),

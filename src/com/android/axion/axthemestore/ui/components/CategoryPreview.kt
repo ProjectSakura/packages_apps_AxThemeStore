@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -305,6 +306,45 @@ fun ChargingAnimationBannerPreview(packageName: String, modifier: Modifier = Mod
     ) {
         Image(
             painter = painterResource(NOTHING_FRAMES[frameIndex]),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+private const val UDFPS_PREVIEW_FRAME_COUNT = 8
+
+@Composable
+fun UdfpsAnimationBannerPreview(packageName: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val style = packageName.substringAfterLast('.')
+    val frames = remember(style) {
+        (1..UDFPS_PREVIEW_FRAME_COUNT).mapNotNull { i ->
+            val name = "preview_udfps_${style}_%02d".format(i)
+            val id = context.resources.getIdentifier(name, "drawable", context.packageName)
+            if (id != 0) id else null
+        }
+    }
+    if (frames.isEmpty()) return
+
+    val infiniteTransition = rememberInfiniteTransition(label = "udfps_anim")
+    val animatedIndex by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = frames.size.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = frames.size * 80, easing = LinearEasing)
+        ),
+        label = "frame_index"
+    )
+    val frameIndex = animatedIndex.toInt().coerceIn(0, frames.size - 1)
+
+    Box(
+        modifier = modifier.background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(frames[frameIndex]),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit,

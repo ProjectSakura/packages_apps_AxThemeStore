@@ -69,6 +69,8 @@ import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
 
 private const val CATEGORY_SIGNAL = "android.theme.customization.signal_icon"
 private const val CATEGORY_WIFI = "android.theme.customization.wifi_icon"
+private const val CATEGORY_UDFPS = "android.theme.customization.udfps_animation"
+private const val CATEGORY_UDFPS_ICON = "android.theme.customization.udfps_icon"
 
 data class OverlayPackItem(
     val packageName: String,
@@ -86,13 +88,23 @@ fun SystemThemePackagesScreen(
 ) {
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf(
-        stringResource(R.string.system_icons_title),
-        stringResource(R.string.system_themes_title)
-    )
+    val isUdfpsSupported = remember { viewModel.getThemeEngineProxy().isUdfpsSupported() }
+    val tabs = remember {
+        mutableListOf(
+            context.getString(R.string.system_icons_title),
+            context.getString(R.string.system_themes_title)
+        ).apply {
+            if (isUdfpsSupported) {
+                add(context.getString(R.string.udfps_animation_title))
+                add(context.getString(R.string.udfps_icon_title))
+            }
+        }.toList()
+    }
 
     var signalPacks by remember { mutableStateOf<List<OverlayPackItem>>(emptyList()) }
     var wifiPacks by remember { mutableStateOf<List<OverlayPackItem>>(emptyList()) }
+    var udfpsPacks by remember { mutableStateOf<List<OverlayPackItem>>(emptyList()) }
+    var udfpsIconPacks by remember { mutableStateOf<List<OverlayPackItem>>(emptyList()) }
 
     val previewMap = remember {
         val map = mutableMapOf<String, String>()
@@ -138,6 +150,34 @@ fun SystemThemePackagesScreen(
                 )
             } catch (_: Exception) { null }
         }
+
+        val activeUdfps = proxy.getCategoryTheme(CATEGORY_UDFPS)
+        udfpsPacks = proxy.getAvailableOverlays(CATEGORY_UDFPS).mapNotNull { pkg ->
+            try {
+                val ai = pm.getApplicationInfo(pkg, 0)
+                OverlayPackItem(
+                    packageName = pkg,
+                    label = ai.loadLabel(pm).toString(),
+                    isActive = pkg == activeUdfps,
+                    icon = try { pm.getApplicationIcon(pkg) } catch (_: Exception) { null },
+                    previewResPrefix = previewMap[pkg] ?: ""
+                )
+            } catch (_: Exception) { null }
+        }
+
+        val activeUdfpsIcon = proxy.getCategoryTheme(CATEGORY_UDFPS_ICON)
+        udfpsIconPacks = proxy.getAvailableOverlays(CATEGORY_UDFPS_ICON).mapNotNull { pkg ->
+            try {
+                val ai = pm.getApplicationInfo(pkg, 0)
+                OverlayPackItem(
+                    packageName = pkg,
+                    label = ai.loadLabel(pm).toString(),
+                    isActive = pkg == activeUdfpsIcon,
+                    icon = try { pm.getApplicationIcon(pkg) } catch (_: Exception) { null },
+                    previewResPrefix = previewMap[pkg] ?: ""
+                )
+            } catch (_: Exception) { null }
+        }
     }
 
     LaunchedEffect(Unit) { refreshPacks() }
@@ -164,8 +204,20 @@ fun SystemThemePackagesScreen(
                 }
             }
 
-            val packs = if (selectedTab == 0) signalPacks else wifiPacks
-            val category = if (selectedTab == 0) CATEGORY_SIGNAL else CATEGORY_WIFI
+            val packs = when (selectedTab) {
+                0 -> signalPacks
+                1 -> wifiPacks
+                2 -> if (isUdfpsSupported) udfpsPacks else emptyList()
+                3 -> if (isUdfpsSupported) udfpsIconPacks else emptyList()
+                else -> emptyList()
+            }
+            val category = when (selectedTab) {
+                0 -> CATEGORY_SIGNAL
+                1 -> CATEGORY_WIFI
+                2 -> if (isUdfpsSupported) CATEGORY_UDFPS else ""
+                3 -> if (isUdfpsSupported) CATEGORY_UDFPS_ICON else ""
+                else -> ""
+            }
 
             if (packs.isEmpty()) {
                 EmptyState()
@@ -180,12 +232,14 @@ fun SystemThemePackagesScreen(
                             onApply = {
                                 val proxy = viewModel.getThemeEngineProxy()
                                 proxy.setCategoryTheme(category, item.packageName)
-                                proxy.setIconThemeWithTargets(
-                                    item.packageName,
-                                    proxy.getIconThemeTargets() + listOf(
-                                        if (selectedTab == 0) "signal" else "wifi"
+                                if (category == CATEGORY_SIGNAL || category == CATEGORY_WIFI) {
+                                    proxy.setIconThemeWithTargets(
+                                        item.packageName,
+                                        proxy.getIconThemeTargets() + listOf(
+                                            if (selectedTab == 0) "signal" else "wifi"
+                                        )
                                     )
-                                )
+                                }
                                 proxy.notifyThemeChanged()
                                 refreshPacks()
                             },

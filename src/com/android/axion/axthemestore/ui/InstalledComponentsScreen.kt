@@ -42,6 +42,12 @@ fun InstalledComponentsScreen(
     onBackClick: () -> Unit
 ) {
     val categoryThemes by viewModel.categoryThemesState.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val themesByPackage = remember(uiState.themes) {
+        uiState.themes.flatMap { theme ->
+            theme.overlays.map { overlay -> overlay.packageName to theme.name }
+        }.toMap()
+    }
     val iconTheme = remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -106,7 +112,7 @@ fun InstalledComponentsScreen(
                 items(categoryThemes.entries.toList()) { (category, packageName) ->
                     ComponentCard(
                         componentName = getCategoryDisplayName(category),
-                        packageOrId = packageName,
+                        packageOrId = themesByPackage[packageName] ?: packageName,
                         icon = getCategoryIcon(category),
                         isBuiltIn = false
                     )

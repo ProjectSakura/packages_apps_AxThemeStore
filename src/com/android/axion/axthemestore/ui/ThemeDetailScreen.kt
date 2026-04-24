@@ -57,6 +57,7 @@ import com.android.axion.axthemestore.ui.components.AsyncNetworkImage
 import com.android.axion.axthemestore.ui.components.BackGesturePreview
 import com.android.axion.axthemestore.ui.components.BatteryStylePreview
 import com.android.axion.axthemestore.ui.components.ChargingAnimationBannerPreview
+import com.android.axion.axthemestore.ui.components.UdfpsAnimationBannerPreview
 import com.android.axion.axthemestore.ui.components.ImagePlaceholder
 import com.android.axion.axthemestore.ui.components.ThemePackagePreview
 import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
@@ -797,7 +798,8 @@ private fun DetailPreviewBox(theme: Theme) {
     } else emptyList()
 
     val isChargingAnim = packageName.contains("charging_animation") || category.contains("charging_animation")
-    val bgModifier = if (isChargingAnim) {
+    val isUdfpsAnim = packageName.contains("udfps_animation") || category.contains("udfps_animation")
+    val bgModifier = if (isChargingAnim || isUdfpsAnim) {
         Modifier.background(Color.Black)
     } else {
         Modifier.background(
@@ -816,6 +818,12 @@ private fun DetailPreviewBox(theme: Theme) {
         when {
             isChargingAnim -> {
                 ChargingAnimationBannerPreview(
+                    packageName = packageName,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            isUdfpsAnim -> {
+                UdfpsAnimationBannerPreview(
                     packageName = packageName,
                     modifier = Modifier.fillMaxSize()
                 )
