@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Themes</string>
+    <string name="see_all">See all</string>
 
 <string name="system_themes_title">System Themes</string>
     <string name="system_icons_title">System Icons</string>

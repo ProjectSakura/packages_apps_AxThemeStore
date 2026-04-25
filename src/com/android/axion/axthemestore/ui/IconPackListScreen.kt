@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,19 +58,23 @@ fun IconPackListScreen(
         viewModel.loadThemedIconStyle()
     }
     
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.surfaceBright,
         topBar = {
-            TopAppBar(
-                title = { 
+            LargeFlexibleTopAppBar(
+                title = {
                     Text(
                         stringResource(R.string.app_icon_packs),
-                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
-                    ) 
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                ),
+                scrollBehavior = scrollBehavior,
             )
         }
     ) { paddingValues ->
@@ -419,7 +424,7 @@ private fun IconPackDetailCard(
             .padding(horizontal = 16.dp),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     ) {
         Column(

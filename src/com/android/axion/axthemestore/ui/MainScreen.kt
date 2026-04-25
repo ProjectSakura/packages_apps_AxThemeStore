@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android.axion.axthemestore.ui
 
 import android.content.Context
@@ -34,7 +36,6 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MainScreen(viewModel: ThemeStoreViewModel) {
     val navController = rememberNavController()

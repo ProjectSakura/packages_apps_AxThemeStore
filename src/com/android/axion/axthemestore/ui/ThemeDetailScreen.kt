@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 
 package com.android.axion.axthemestore.ui
 
@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +63,6 @@ import com.android.axion.axthemestore.ui.components.ImagePlaceholder
 import com.android.axion.axthemestore.ui.components.ThemePackagePreview
 import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ThemeDetailScreen(
     theme: Theme,
@@ -74,10 +74,18 @@ fun ThemeDetailScreen(
     val pendingChanges by viewModel.pendingComponentChanges.collectAsStateWithLifecycle()
     val hasPendingChanges = pendingChanges.containsKey(theme.id)
     
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.surfaceBright,
         topBar = {
-            TopAppBar(
-                title = { Text(theme.name) },
+            LargeFlexibleTopAppBar(
+                title = {
+                    Text(
+                        text = theme.name,
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -87,8 +95,10 @@ fun ThemeDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                ),
+                scrollBehavior = scrollBehavior,
             )
         },
         bottomBar = {
@@ -806,7 +816,7 @@ private fun DetailPreviewBox(theme: Theme) {
             brush = Brush.linearGradient(
                 colors = listOf(
                     MaterialTheme.colorScheme.surfaceContainerHigh,
-                    MaterialTheme.colorScheme.surfaceContainer
+                    MaterialTheme.colorScheme.surfaceBright
                 )
             )
         )

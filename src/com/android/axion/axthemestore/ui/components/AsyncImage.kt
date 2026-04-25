@@ -14,50 +14,31 @@
  * limitations under the License.
 */
 
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalGlideComposeApi::class)
 
 package com.android.axion.axthemestore.ui.components
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.util.LruCache
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
-import androidx.compose.ui.graphics.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.*
-import java.net.URL
-
-object ImageCache {
-    private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
-    private val cacheSize = maxMemory / 8
-    
-    private val cache = object : LruCache<String, Bitmap>(cacheSize) {
-        override fun sizeOf(key: String, bitmap: Bitmap): Int {
-            return bitmap.byteCount / 1024
-        }
-    }
-    
-    fun get(url: String): Bitmap? = cache.get(url)
-    
-    fun put(url: String, bitmap: Bitmap) {
-        cache.put(url, bitmap)
-    }
-}
-
-sealed class ImageLoadState {
-    data object Loading : ImageLoadState()
-    data class Success(val bitmap: Bitmap) : ImageLoadState()
-    data object Error : ImageLoadState()
-}
+import com.android.axion.axthemestore.data.ThumbnailPreloader
+import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+import com.bumptech.glide.integration.compose.GlideImage
+import com.bumptech.glide.integration.compose.placeholder
 
 @Composable
 fun AsyncNetworkImage(
@@ -65,77 +46,44 @@ fun AsyncNetworkImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    errorContent: @Composable (() -> Unit)? = null
+    errorContent: @Composable (() -> Unit)? = null,
 ) {
-    var loadState by remember(url) { mutableStateOf<ImageLoadState>(ImageLoadState.Loading) }
-    
-    LaunchedEffect(url) {
-        val cached = ImageCache.get(url)
-        if (cached != null) {
-            loadState = ImageLoadState.Success(cached)
-            return@LaunchedEffect
-        }
-        
-        loadState = ImageLoadState.Loading
-        loadState = try {
-            val bitmap = withContext(Dispatchers.IO) {
-                val connection = URL(url).openConnection()
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                connection.inputStream.use { inputStream ->
-                    BitmapFactory.decodeStream(inputStream)
-                }
-            }
-            if (bitmap != null) {
-                ImageCache.put(url, bitmap)
-                ImageLoadState.Success(bitmap)
-            } else {
-                ImageLoadState.Error
-            }
-        } catch (e: Exception) {
-            ImageLoadState.Error
-        }
-    }
-    
-    when (val state = loadState) {
-        is ImageLoadState.Loading -> {
+    GlideImage(
+        model = url,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = contentScale,
+        requestBuilderTransform = { it.override(ThumbnailPreloader.THUMB_PX, ThumbnailPreloader.THUMB_PX) },
+        loading = placeholder {
             Box(
-                modifier = modifier
+                modifier = Modifier
+                    .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
-                LoadingIndicator(
-                    modifier = Modifier.size(24.dp)
-                )
+                LoadingIndicator(modifier = Modifier.size(24.dp))
             }
-        }
-        is ImageLoadState.Success -> {
-            Image(
-                bitmap = state.bitmap.asImageBitmap(),
-                contentDescription = contentDescription,
-                contentScale = contentScale,
-                modifier = modifier
-            )
-        }
-        is ImageLoadState.Error -> {
+        },
+        failure = placeholder {
             if (errorContent != null) {
                 errorContent()
             } else {
                 Box(
-                    modifier = modifier
+                    modifier = Modifier
+                        .fillMaxSize()
                         .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.BrokenImage,
                         contentDescription = "Failed to load image",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(32.dp),
                     )
                 }
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable

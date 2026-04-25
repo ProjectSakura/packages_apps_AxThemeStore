@@ -223,6 +223,7 @@ class ThemeRepository(private val context: Context) {
             minSdk = json.optInt("minSdk", 31),
             previewImages = previews,
             category = json.optString("category"),
+            pack = json.optString("pack").takeIf { it.isNotEmpty() },
             tags = tags,
             overlays = overlays,
             isUnified = json.optBoolean("isUnified", false),

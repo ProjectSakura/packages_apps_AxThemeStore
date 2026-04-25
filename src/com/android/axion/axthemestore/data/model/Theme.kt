@@ -36,6 +36,7 @@ data class Theme(
     val minSdk: Int = 31,
     val previewImages: List<String> = emptyList(),
     val category: String = "",
+    val pack: String? = null,
     val tags: List<String> = emptyList(),
     val overlays: List<ThemeOverlay> = emptyList(),
     val isUnified: Boolean = false,

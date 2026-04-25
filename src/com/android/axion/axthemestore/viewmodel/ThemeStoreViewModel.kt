@@ -26,12 +26,14 @@ import com.android.axion.axthemestore.data.model.Theme
 import com.android.axion.axthemestore.data.model.ThemeCategory
 import com.android.axion.axthemestore.data.model.ThemeInstallState
 import com.android.axion.axthemestore.data.model.ThemeOverlay
+import com.android.axion.axthemestore.data.ThumbnailPreloader
 import com.android.axion.axthemestore.data.repository.ThemeRepository
 import com.android.axion.axthemestore.download.ThemeDownloadManager
 import com.android.axion.axthemestore.engine.ThemeEngineProxy
 import com.android.axion.axthemestore.install.ThemeInstaller
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.*
+import org.json.JSONArray
 
 class ThemeStoreViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -73,28 +75,36 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
         loadThemes()
         loadIconPacks()
         loadThemedIconStyle()
-        refreshComponentStates()
+        viewModelScope.launch { refreshComponentStates() }
         loadSearchHistory()
     }
     
-    private fun refreshComponentStates() {
-        _enabledComponents.value = themeEngineProxy.getIconThemeTargets().toSet()
-        _categoryThemes.value = themeEngineProxy.getCategoryThemes()
+    private suspend fun refreshComponentStates() {
+        val (targets, cats) = withContext(Dispatchers.IO) {
+            themeEngineProxy.getIconThemeTargets().toSet() to themeEngineProxy.getCategoryThemes()
+        }
+        _enabledComponents.value = targets
+        _categoryThemes.value = cats
     }
 
     fun loadThemes(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            
-            repository.fetchThemes(forceRefresh).fold(
+
+            val fetchResult = withContext(Dispatchers.IO) {
+                repository.fetchThemes(forceRefresh)
+            }
+            fetchResult.fold(
                 onSuccess = { response ->
                     val storePackages = response.themes
                         .flatMap { it.overlays }
                         .map { it.packageName }
                         .toSet()
-                    
-                    val thirdPartyThemes = repository.getInstalledThirdPartyThemes(storePackages)
-                    
+
+                    val thirdPartyThemes = withContext(Dispatchers.IO) {
+                        repository.getInstalledThirdPartyThemes(storePackages)
+                    }
+
                     val allThemes = response.themes + thirdPartyThemes
                     
                     val baseCategories = response.categories
@@ -128,13 +138,16 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                         )
                     }
                     updateInstallStates(allThemes)
-                    
+
                     refreshComponentStates()
+                    ThumbnailPreloader.preload(getApplication(), allThemes)
                 },
                 onFailure = { error ->
                     Log.e(TAG, "Failed to load themes, entering offline mode", error)
 
-                    val thirdPartyThemes = repository.getInstalledThirdPartyThemes(emptySet())
+                    val thirdPartyThemes = withContext(Dispatchers.IO) {
+                        repository.getInstalledThirdPartyThemes(emptySet())
+                    }
 
                     val offlineCategories = thirdPartyThemes
                         .map { it.category }
@@ -163,6 +176,7 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                     }
                     updateInstallStates(thirdPartyThemes)
                     refreshComponentStates()
+                    ThumbnailPreloader.preload(getApplication(), thirdPartyThemes)
                 }
             )
 
@@ -170,24 +184,24 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun checkInstallStates() {
-        refreshComponentStates()
-        val themes = _uiState.value.themes
-        if (themes.isNotEmpty()) {
-            updateInstallStates(themes)
+        viewModelScope.launch {
+            refreshComponentStates()
+            val themes = _uiState.value.themes
+            if (themes.isNotEmpty()) {
+                updateInstallStates(themes)
+            }
         }
     }
     
-    private fun updateInstallStates(themes: List<Theme>) {
-        val currentIconTheme = themeEngineProxy.getIconTheme()
+    private suspend fun updateInstallStates(themes: List<Theme>) = withContext(Dispatchers.IO) {
         val enabledThemes = themeEngineProxy.getEnabledThemes()
+        val categoryThemes = themeEngineProxy.getCategoryThemes()
 
         val states = themes.associate { theme ->
             val state = when {
                 theme.isUnified && theme.overlays.isNotEmpty() -> {
                     val packageName = theme.overlays.first().packageName
                     val isInstalled = repository.isThemeInstalled(packageName)
-                    
-                    val categoryThemes = themeEngineProxy.getCategoryThemes()
                     val targets = theme.overlays.first().targets
                     val isAnyComponentActive = targets.any { target ->
                         categoryThemes[target] == packageName
@@ -206,7 +220,6 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                         repository.isThemeInstalled(overlay.packageName)
                     }.map { it.componentId }.toSet()
 
-                    val categoryThemes = themeEngineProxy.getCategoryThemes()
                     val isAnyActive = theme.overlays.any { overlay ->
                         enabledThemes[overlay.componentId] == overlay.packageName
                                 || categoryThemes[overlay.componentId] == overlay.packageName
@@ -698,78 +711,80 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
 
     fun loadIconPacks() {
         viewModelScope.launch {
-            val packs = repository.getInstalledIconPacks()
-            val currentPack = themeEngineProxy.getIconPack()
-            
-            _uiState.update { 
+            val (packs, currentPack) = withContext(Dispatchers.IO) {
+                repository.getInstalledIconPacks() to themeEngineProxy.getIconPack()
+            }
+            _uiState.update {
                 it.copy(
                     iconPacks = packs,
                     currentIconPack = currentPack
-                ) 
+                )
             }
         }
     }
 
     fun applyIconPack(packageName: String) {
         viewModelScope.launch {
-            val success = if (packageName.isEmpty()) {
-                themeEngineProxy.clearIconPack()
-            } else {
-                themeEngineProxy.setIconPack(packageName)
+            val success = withContext(Dispatchers.IO) {
+                if (packageName.isEmpty()) themeEngineProxy.clearIconPack()
+                else themeEngineProxy.setIconPack(packageName)
             }
-            
             if (success) {
                 _uiState.update { it.copy(currentIconPack = if (packageName.isEmpty()) null else packageName) }
             }
         }
     }
-    
+
     fun loadThemedIconStyle() {
         viewModelScope.launch {
-            val style = themeEngineProxy.getThemedIconStyle()
-            val enabled = themeEngineProxy.isThemedIconsEnabled()
-            _uiState.update { 
+            val (style, enabled) = withContext(Dispatchers.IO) {
+                themeEngineProxy.getThemedIconStyle() to themeEngineProxy.isThemedIconsEnabled()
+            }
+            _uiState.update {
                 it.copy(
                     themedIconStyle = style,
                     themedIconsEnabled = enabled
-                ) 
+                )
             }
         }
     }
 
     fun setThemedIconStyle(style: String) {
         viewModelScope.launch {
-            themeEngineProxy.setThemedIconStyle(style)
+            withContext(Dispatchers.IO) { themeEngineProxy.setThemedIconStyle(style) }
             _uiState.update { it.copy(themedIconStyle = style) }
         }
     }
 
     fun setThemedIconsEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            themeEngineProxy.setThemedIconsEnabled(enabled)
+            withContext(Dispatchers.IO) {
+                themeEngineProxy.setThemedIconsEnabled(enabled)
+                if (enabled) themeEngineProxy.setIconPack("")
+            }
             _uiState.update { it.copy(themedIconsEnabled = enabled) }
-            
             if (enabled) {
-                themeEngineProxy.setIconPack("")
                 _uiState.update { it.copy(currentIconPack = null) }
             }
         }
     }
     
     private fun loadSearchHistory() {
-        val historyJson = sharedPrefs.getString(KEY_SEARCH_HISTORY, null)
-        if (historyJson != null) {
-            try {
-                val jsonArray = org.json.JSONArray(historyJson)
-                val history = mutableListOf<String>()
-                for (i in 0 until jsonArray.length()) {
-                    history.add(jsonArray.getString(i))
-                }
-                _searchHistory.value = history
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load search history", e)
-                _searchHistory.value = emptyList()
+        viewModelScope.launch {
+            val history = withContext(Dispatchers.IO) {
+                val historyJson = sharedPrefs.getString(KEY_SEARCH_HISTORY, null)
+                    ?: return@withContext null
+                runCatching {
+                    val jsonArray = JSONArray(historyJson)
+                    val list = mutableListOf<String>()
+                    for (i in 0 until jsonArray.length()) {
+                        list.add(jsonArray.getString(i))
+                    }
+                    list
+                }.onFailure { Log.e(TAG, "Failed to load search history", it) }
+                    .getOrDefault(emptyList())
             }
+            if (history != null) _searchHistory.value = history
         }
     }
     
@@ -822,7 +837,7 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
 }
 
 data class ThemeStoreUiState(
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val themes: List<Theme> = emptyList(),
     val categories: List<ThemeCategory> = emptyList(),
     val selectedCategory: String? = null,

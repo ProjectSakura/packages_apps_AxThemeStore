@@ -14,7 +14,7 @@
  * limitations under the License.
 */
 
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalGlideComposeApi::class)
 
 package com.android.axion.axthemestore.ui.components
 
@@ -32,13 +32,15 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+import com.bumptech.glide.integration.compose.GlideImage
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
@@ -56,14 +58,13 @@ fun ThemeCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.large,
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column {
             Box(
@@ -73,14 +74,6 @@ fun ThemeCard(
                     .clip(MaterialTheme.shapes.extraLarge)
             ) {
                 LocalPreviewBox(theme = theme)
-                
-                InstallStateBadge(
-                    state = installState,
-                    theme = theme,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                )
             }
             
             Column(
@@ -88,14 +81,14 @@ fun ThemeCard(
             ) {
                 Text(
                     text = theme.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
-                Spacer(modifier = Modifier.height(6.dp))
-                
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
                     text = theme.description,
                     style = MaterialTheme.typography.bodyMedium,
@@ -104,36 +97,51 @@ fun ThemeCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                
-                Spacer(modifier = Modifier.height(12.dp))
+
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(MaterialTheme.shapes.small)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text(
-                            text = theme.author,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = theme.author,
+                                style = MaterialTheme.typography.labelLargeEmphasized,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+
+                        if (theme.totalFileSize > 0) {
+                            Text(
+                                text = theme.totalFileSize.formatFileSize(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.outline,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                    
-                    if (theme.totalFileSize > 0) {
-                        Text(
-                            text = theme.totalFileSize.formatFileSize(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
+
+                    InstallStateBadge(
+                        state = installState,
+                        theme = theme,
+                    )
                 }
             }
         }
@@ -251,58 +259,35 @@ private fun InstallStateBadge(
 @Composable
 private fun LocalPreviewBox(theme: Theme) {
     val context = LocalContext.current
-    val previewMap = remember {
-        val map = mutableMapOf<String, String>()
-        try {
-            val entries = context.resources.getStringArray(R.array.overlay_preview_map)
-            for (entry in entries) {
-                val parts = entry.split("|", limit = 2)
-                if (parts.size == 2) map[parts[0]] = parts[1]
-            }
-        } catch (_: Exception) {}
-        map
-    }
-
     val packageName = theme.overlays.firstOrNull()?.packageName ?: ""
     val category = theme.category.ifEmpty { theme.overlays.firstOrNull()?.componentId ?: "" }
-    val prefix = previewMap[packageName] ?: ""
-    val resIds = if (prefix.isNotEmpty()) {
-        (1..4).mapNotNull { i ->
-            val id = context.resources.getIdentifier("${prefix}_$i", "drawable", context.packageName)
-            if (id != 0) id else null
-        }
-    } else emptyList()
+    val resIds = remember(packageName) { previewResIdsFor(context, packageName) }
 
     val isBattery = packageName.contains("battery") || category.contains("battery")
     val isBackGesture = packageName.contains("back_gesture") || category.contains("back_gesture")
     val isUdfpsAnim = packageName.contains("udfps_animation") || category.contains("udfps_animation")
+    val isChargingAnim = packageName.contains("charging_animation") || category.contains("charging_animation")
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                        MaterialTheme.colorScheme.surfaceContainer
-                    )
-                )
-            ),
+            .background(MaterialTheme.colorScheme.surfaceContainerLow),
         contentAlignment = Alignment.Center
     ) {
         if (resIds.isNotEmpty()) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 16.dp),
             ) {
                 resIds.forEach { resId ->
-                    Image(
-                        painter = painterResource(resId),
+                    GlideImage(
+                        model = resId,
                         contentDescription = null,
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(28.dp),
                         colorFilter = ColorFilter.tint(
                             MaterialTheme.colorScheme.onSurface
-                        )
+                        ),
                     )
                 }
             }
@@ -313,10 +298,17 @@ private fun LocalPreviewBox(theme: Theme) {
             )
         } else if (isBackGesture) {
             BackGesturePreview(modifier = Modifier.fillMaxSize())
+        } else if (isChargingAnim) {
+            ChargingAnimationBannerPreview(
+                packageName = packageName,
+                modifier = Modifier.fillMaxSize(),
+                animate = false,
+            )
         } else if (isUdfpsAnim) {
             UdfpsAnimationBannerPreview(
                 packageName = packageName,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                animate = false,
             )
         } else if (theme.previewImages.isNotEmpty()) {
             AsyncNetworkImage(
@@ -342,6 +334,35 @@ private fun LocalPreviewBox(theme: Theme) {
             )
         }
     }
+}
+
+private val sPreviewPrefixCache = mutableMapOf<String, String>()
+private var sPreviewPrefixLoaded = false
+private val sPreviewIdsCache = mutableMapOf<String, List<Int>>()
+
+private fun previewResIdsFor(context: Context, packageName: String): List<Int> {
+    if (packageName.isEmpty()) return emptyList()
+    if (!sPreviewPrefixLoaded) {
+        try {
+            val entries = context.resources.getStringArray(R.array.overlay_preview_map)
+            for (entry in entries) {
+                val parts = entry.split("|", limit = 2)
+                if (parts.size == 2) sPreviewPrefixCache[parts[0]] = parts[1]
+            }
+        } catch (_: Exception) {}
+        sPreviewPrefixLoaded = true
+    }
+    sPreviewIdsCache[packageName]?.let { return it }
+    val prefix = sPreviewPrefixCache[packageName] ?: run {
+        sPreviewIdsCache[packageName] = emptyList()
+        return emptyList()
+    }
+    val ids = (1..4).mapNotNull { i ->
+        val id = context.resources.getIdentifier("${prefix}_$i", "drawable", context.packageName)
+        if (id != 0) id else null
+    }
+    sPreviewIdsCache[packageName] = ids
+    return ids
 }
 
 private fun categoryIcon(theme: Theme): ImageVector {

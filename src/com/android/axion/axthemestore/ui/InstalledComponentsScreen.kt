@@ -14,6 +14,8 @@
  * limitations under the License.
 */
 
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android.axion.axthemestore.ui
 
 import androidx.compose.foundation.layout.*
@@ -23,10 +25,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.*
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,7 +40,6 @@ import com.android.axion.axthemestore.R
 import com.android.axion.axthemestore.engine.ThemeEngineProxy
 import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InstalledComponentsScreen(
     viewModel: ThemeStoreViewModel,
@@ -54,15 +58,17 @@ fun InstalledComponentsScreen(
         val proxy = ThemeEngineProxy(viewModel.getApplication())
         iconTheme.value = proxy.getIconTheme()
     }
-    
+
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.surfaceBright,
         topBar = {
-            TopAppBar(
-                title = { 
+            LargeFlexibleTopAppBar(
+                title = {
                     Text(
                         text = stringResource(R.string.installed_components),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 },
                 navigationIcon = {
@@ -74,8 +80,10 @@ fun InstalledComponentsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                ),
+                scrollBehavior = scrollBehavior,
             )
         }
     ) { paddingValues ->
@@ -122,7 +130,7 @@ fun InstalledComponentsScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
                         )
                     ) {
                         Column(
@@ -177,7 +185,7 @@ private fun ComponentCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
         shape = MaterialTheme.shapes.small
     ) {
