@@ -50,6 +50,15 @@ class ThemeEngineProxy(private val context: Context) {
         private val workerHandler: Handler by lazy { Handler(workerThread.looper) }
 
         const val SETTINGS_THEME_ENGINE_DATA = "theme_engine_data"
+        private const val OVERLAY_CATEGORY_PREFIX = "android.theme.customization."
+
+        private val CATEGORY_ALIASES = mapOf(
+            "back_gesture" to "android.theme.customization.back_gesture",
+            "charging_animation" to "android.theme.customization.charging_animation",
+            "battery_style" to "android.theme.customization.battery_style",
+            "udfps_animation" to "android.theme.customization.udfps_animation",
+            "udfps_icon" to "android.theme.customization.udfps_icon",
+        )
 
         private val SYNCED_OVERLAY_CATEGORIES = setOf(
             "android.theme.customization.icon_pack.android",
@@ -119,7 +128,7 @@ class ThemeEngineProxy(private val context: Context) {
             val catThemesObj = json.optJSONObject("categoryThemes")
             catThemesObj?.keys()?.forEach { key ->
                 val pkgName = catThemesObj.optString(key)
-                if (pkgName.isNotBlank()) categoryThemes[key] = pkgName
+                if (pkgName.isNotBlank()) categoryThemes[normalizeOverlayCategory(key)] = pkgName
             }
 
             val themesMap = mutableMapOf<String, ThemeCategoryConfig>()
@@ -225,40 +234,43 @@ class ThemeEngineProxy(private val context: Context) {
     }
 
     fun setCategoryTheme(category: String, packageName: String): Boolean {
+        val overlayCategory = normalizeOverlayCategory(category)
         val config = getThemeConfig()
-        val oldPackage = config.categoryThemes[category]
-        val updated = buildUpdatedCategoryConfig(config, config.categoryThemes + (category to packageName))
+        val oldPackage = config.categoryThemes[overlayCategory]
+        val updated = buildUpdatedCategoryConfig(config, config.categoryThemes + (overlayCategory to packageName))
         val saved = saveThemeConfig(updated)
         if (saved) {
+            syncOverlayPackagesSettings(updated.categoryThemes)
             workerHandler.post {
                 applyOverlays(packageName, setOfNotNull(oldPackage?.takeIf { it != packageName }))
-                syncOverlayPackagesSettings(updated.categoryThemes)
             }
         }
         return saved
     }
 
     fun clearCategoryTheme(category: String): Boolean {
+        val overlayCategory = normalizeOverlayCategory(category)
         val config = getThemeConfig()
-        val oldPackage = config.categoryThemes[category]
-        val updated = buildUpdatedCategoryConfig(config, config.categoryThemes - category)
+        val oldPackage = config.categoryThemes[overlayCategory]
+        val updated = buildUpdatedCategoryConfig(config, config.categoryThemes - overlayCategory)
         val saved = saveThemeConfig(updated)
         if (saved) {
+            syncOverlayPackagesSettings(updated.categoryThemes)
             workerHandler.post {
                 applyOverlays(null, setOfNotNull(oldPackage))
-                syncOverlayPackagesSettings(updated.categoryThemes)
             }
         }
         return saved
     }
 
     fun applyThemeComponents(packageName: String, categories: List<String>): Boolean {
+        val overlayCategories = categories.map(::normalizeOverlayCategory)
         val config = getThemeConfig()
         val newCategoryThemes = config.categoryThemes.toMutableMap().apply {
-            entries.removeAll { it.value == packageName && it.key !in categories }
-            categories.forEach { put(it, packageName) }
+            entries.removeAll { it.value == packageName && it.key !in overlayCategories }
+            overlayCategories.forEach { put(it, packageName) }
         }
-        val oldPackages = categories
+        val oldPackages = overlayCategories
             .mapNotNull { config.categoryThemes[it] }
             .filter { it != packageName }
             .toSet()
@@ -276,17 +288,18 @@ class ThemeEngineProxy(private val context: Context) {
         val updated = buildUpdatedCategoryConfig(config, config.categoryThemes.filterValues { it != packageName })
         val saved = saveThemeConfig(updated)
         if (saved) {
+            syncOverlayPackagesSettings(updated.categoryThemes)
             workerHandler.post {
                 applyOverlays(null, setOf(packageName))
-                syncOverlayPackagesSettings(updated.categoryThemes)
             }
         }
         return saved
     }
 
-    fun getCategoryTheme(category: String): String? = getThemeConfig().categoryThemes[category]
+    fun getCategoryTheme(category: String): String? =
+        getThemeConfig().categoryThemes[normalizeOverlayCategory(category)]
 
-    fun getCategoryThemes(): Map<String, String> = getThemeConfig().categoryThemes
+    fun getCategoryThemes(): Map<String, String> = getThemeConfig().categoryThemes.withAliases()
 
     private fun buildUpdatedCategoryConfig(config: ThemeEngineConfig, newCategoryThemes: Map<String, String>): ThemeEngineConfig {
         val uniquePackages = newCategoryThemes.values.toSet()
@@ -332,9 +345,15 @@ class ThemeEngineProxy(private val context: Context) {
             )
             val json = if (current.isNullOrBlank()) JSONObject() else JSONObject(current)
 
-            SYNCED_OVERLAY_CATEGORIES.forEach { category -> json.remove(category) }
+            SYNCED_OVERLAY_CATEGORIES.forEach { category ->
+                json.remove(category)
+                json.remove(category.removePrefix(OVERLAY_CATEGORY_PREFIX))
+            }
             categoryThemes.forEach { (category, packageName) ->
-                if (category in SYNCED_OVERLAY_CATEGORIES) json.put(category, packageName)
+                val overlayCategory = normalizeOverlayCategory(category)
+                if (overlayCategory in SYNCED_OVERLAY_CATEGORIES) {
+                    json.put(overlayCategory, packageName)
+                }
             }
 
             Settings.Secure.putStringForUser(
@@ -346,6 +365,17 @@ class ThemeEngineProxy(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync overlay packages settings", e)
         }
+    }
+
+    private fun normalizeOverlayCategory(category: String): String =
+        if (category.startsWith(OVERLAY_CATEGORY_PREFIX)) category else CATEGORY_ALIASES[category] ?: category
+
+    private fun Map<String, String>.withAliases(): Map<String, String> {
+        val result = toMutableMap()
+        CATEGORY_ALIASES.forEach { (alias, category) ->
+            result[category]?.let { result[alias] = it }
+        }
+        return result
     }
 
     fun setThemedIconStyle(style: String) {
