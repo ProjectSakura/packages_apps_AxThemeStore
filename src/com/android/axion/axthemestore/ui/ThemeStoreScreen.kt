@@ -78,6 +78,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+internal val LocalUdfpsSupported = staticCompositionLocalOf { true }
+
 @Composable
 fun ThemeStoreScreen(
     viewModel: ThemeStoreViewModel,
@@ -788,8 +790,8 @@ private fun ThemePreviewBox(theme: Theme, transparentBg: Boolean = false) {
     val isBattery = previewMeta.isBattery
     val isBackGesture = previewMeta.isBackGesture
     val isChargingAnim = previewMeta.isChargingAnim
-    val isUdfpsAnim = previewMeta.isUdfpsAnim
-    val isUdfpsIcon = previewMeta.isUdfpsIcon
+    val isUdfpsAnim = previewMeta.isUdfpsAnim && LocalUdfpsSupported.current
+    val isUdfpsIcon = previewMeta.isUdfpsIcon && LocalUdfpsSupported.current
     val previewResIds = remember(packageName) { getLocalPreviewResIds(context, packageName) }
 
     val bgModifier = if (transparentBg) Modifier else Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
@@ -936,8 +938,8 @@ private fun ThemeListItem(
                 val isBattery = previewMeta.isBattery
                 val isBackGesture = previewMeta.isBackGesture
                 val isChargingAnim = previewMeta.isChargingAnim
-                val isUdfpsAnim = previewMeta.isUdfpsAnim
-                val isUdfpsIcon = previewMeta.isUdfpsIcon
+                val isUdfpsAnim = previewMeta.isUdfpsAnim && LocalUdfpsSupported.current
+                val isUdfpsIcon = previewMeta.isUdfpsIcon && LocalUdfpsSupported.current
                 val ctx = LocalContext.current
                 val previewResIds = remember(packageName) { getLocalPreviewResIds(ctx, packageName) }
 

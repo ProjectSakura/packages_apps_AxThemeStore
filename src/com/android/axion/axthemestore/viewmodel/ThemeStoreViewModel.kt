@@ -106,6 +106,11 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                     }
 
                     val allThemes = response.themes + thirdPartyThemes
+
+                    val isUdfpsSupported = themeEngineProxy.isUdfpsSupported()
+                    val filteredThemes = if (isUdfpsSupported) allThemes else allThemes.filter { theme ->
+                        !themeEngineProxy.isUdfpsCategory(theme.category)
+                    }
                     
                     val baseCategories = response.categories
 
@@ -124,20 +129,23 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                         }
 
                     val categories = (baseCategories + extraCategories).let { cats ->
-                        if (thirdPartyThemes.any { it.category == "local" }) {
+                        val withLocal = if (thirdPartyThemes.any { it.category == "local" }) {
                             cats + ThemeCategory(id = "local", name = "Installed", icon = "category")
                         } else cats
+                        if (isUdfpsSupported) withLocal else withLocal.filter { cat ->
+                            !themeEngineProxy.isUdfpsCategory(cat.id)
+                        }
                     }
                     
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
-                            themes = allThemes,
+                            themes = filteredThemes,
                             categories = categories,
                             error = null
                         )
                     }
-                    updateInstallStates(allThemes)
+                    updateInstallStates(filteredThemes)
 
                     refreshComponentStates()
                     ThumbnailPreloader.preload(getApplication(), allThemes)
@@ -149,7 +157,11 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                         repository.getInstalledThirdPartyThemes(emptySet())
                     }
 
-                    val offlineCategories = thirdPartyThemes
+                    val isUdfpsSupported = themeEngineProxy.isUdfpsSupported()
+                    val filteredThirdParty = if (isUdfpsSupported) thirdPartyThemes else
+                        thirdPartyThemes.filter { !themeEngineProxy.isUdfpsCategory(it.category) }
+
+                    val offlineCategories = filteredThirdParty
                         .map { it.category }
                         .distinct()
                         .map { cat ->
@@ -162,21 +174,23 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                                     },
                                 icon = "palette"
                             )
+                        }.filter { cat ->
+                            isUdfpsSupported || !themeEngineProxy.isUdfpsCategory(cat.id)
                         }
 
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
-                            themes = thirdPartyThemes,
+                            themes = filteredThirdParty,
                             categories = offlineCategories,
-                            error = if (thirdPartyThemes.isEmpty())
+                            error = if (filteredThirdParty.isEmpty())
                                 error.message ?: "Failed to load themes"
                             else null
                         )
                     }
-                    updateInstallStates(thirdPartyThemes)
+                    updateInstallStates(filteredThirdParty)
                     refreshComponentStates()
-                    ThumbnailPreloader.preload(getApplication(), thirdPartyThemes)
+                    ThumbnailPreloader.preload(getApplication(), filteredThirdParty)
                 }
             )
 

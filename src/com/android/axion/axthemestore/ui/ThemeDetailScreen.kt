@@ -52,6 +52,7 @@ import com.android.axion.axthemestore.R
 import com.android.axion.axthemestore.data.model.Theme
 import com.android.axion.axthemestore.data.model.ThemeInstallState
 import com.android.axion.axthemestore.data.model.ThemeOverlay
+import com.android.axion.axthemestore.engine.ThemeEngineProxy
 import com.android.axion.axthemestore.data.model.formatFileSize
 import com.android.axion.axthemestore.data.model.hasUpdate
 import com.android.axion.axthemestore.ui.components.AsyncNetworkImage
@@ -808,8 +809,9 @@ private fun DetailPreviewBox(theme: Theme) {
     } else emptyList()
 
     val isChargingAnim = packageName.contains("charging_animation") || category.contains("charging_animation")
-    val isUdfpsAnim = packageName.contains("udfps_animation") || category.contains("udfps_animation")
-    val bgModifier = if (isChargingAnim || isUdfpsAnim) {
+    val isUdfpsAnim = (packageName.contains("udfps_animation") || category.contains("udfps_animation"))
+    val isUdfpsHardwareSupported = remember { ThemeEngineProxy(context).isUdfpsSupported() }
+    val bgModifier = if (isChargingAnim || (isUdfpsAnim && isUdfpsHardwareSupported)) {
         Modifier.background(Color.Black)
     } else {
         Modifier.background(
@@ -832,7 +834,7 @@ private fun DetailPreviewBox(theme: Theme) {
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            isUdfpsAnim -> {
+            isUdfpsAnim && isUdfpsHardwareSupported -> {
                 UdfpsAnimationBannerPreview(
                     packageName = packageName,
                     modifier = Modifier.fillMaxSize()

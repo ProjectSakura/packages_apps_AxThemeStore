@@ -32,13 +32,28 @@ class ThemeEngineProxy(private val context: Context) {
 
     fun isUdfpsSupported(): Boolean {
         return try {
-            val fm = context.getSystemService(FingerprintManager::class.java)
-            val props = fm?.sensorPropertiesInternal
-            props?.any { it.isAnyUdfpsType } == true
+            context.resources.run {
+                if (getIdentifier("config_is_powerbutton_fps", "bool", "android")
+                        .takeIf { it != 0 }?.let { getBoolean(it) } == true) {
+                    return false
+                }
+                getIdentifier("config_udfps_sensor_props", "array", "android")
+                    .takeIf { it != 0 }
+                    ?.let { getIntArray(it) }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { return true }
+            }
+            context.getSystemService(FingerprintManager::class.java)
+                ?.sensorPropertiesInternal
+                ?.any { it.isAnyUdfpsType } == true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to check UDFPS support", e)
             false
         }
+    }
+
+    fun isUdfpsCategory(category: String): Boolean {
+        return category.contains("udfps")
     }
 
     companion object {

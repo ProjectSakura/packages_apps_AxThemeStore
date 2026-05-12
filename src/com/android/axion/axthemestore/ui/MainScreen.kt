@@ -27,7 +27,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.*
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -76,6 +78,8 @@ fun MainScreen(viewModel: ThemeStoreViewModel) {
     }
     
     val motionScheme = MaterialTheme.motionScheme
+    val isUdfpsSupported = remember { viewModel.getThemeEngineProxy().isUdfpsSupported() }
+    CompositionLocalProvider(LocalUdfpsSupported provides isUdfpsSupported) {
     NavHost(
         navController = navController,
         startDestination = "themes",
@@ -139,5 +143,6 @@ fun MainScreen(viewModel: ThemeStoreViewModel) {
                 )
             }
         }
+    }
     }
 }
