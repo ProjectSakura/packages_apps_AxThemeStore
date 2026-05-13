@@ -153,7 +153,10 @@ fun CategoryThemesScreen(
                 "local" -> uiState.themes.filter { it.isLocal }
                 else -> uiState.themes.filter { it.category == categoryId }
             }
-            val sorted = source.sortedBy { it.name.lowercase() }
+            val sorted = source.sortedWith(
+                compareByDescending<Theme> { themeStates[it.id] is ThemeInstallState.Installed }
+                    .thenBy { it.name.lowercase() }
+            )
             val grouped = sorted.groupBy { it.pack }
             DrillDownData(
                 ungrouped = grouped[null].orEmpty(),
@@ -490,9 +493,14 @@ private fun DashboardContent(
     onThemeClick: (Theme) -> Unit,
     onNavigateToCategory: (String) -> Unit,
 ) {
-    val themesByCategory = remember(uiState.themes) {
+    val themesByCategory = remember(uiState.themes, themeStates) {
         uiState.themes.groupBy { it.category }
-            .mapValues { (_, list) -> list.sortedBy { it.name.lowercase() } }
+            .mapValues { (_, list) -> 
+                list.sortedWith(
+                    compareByDescending<Theme> { themeStates[it.id] is ThemeInstallState.Installed }
+                        .thenBy { it.name.lowercase() }
+                )
+            }
     }
     val installedThemes = remember(uiState.themes, themeStates) {
         uiState.themes.filter { theme ->
@@ -500,7 +508,10 @@ private fun DashboardContent(
             s is ThemeInstallState.Installed ||
                     s is ThemeInstallState.InstalledInactive ||
                     theme.isLocal
-        }.sortedBy { it.name.lowercase() }
+        }.sortedWith(
+            compareByDescending<Theme> { themeStates[it.id] is ThemeInstallState.Installed }
+                .thenBy { it.name.lowercase() }
+        )
     }
     val featuredThemes = remember(uiState.themes) {
         uiState.themes.shuffled().take(RAIL_LIMIT)
